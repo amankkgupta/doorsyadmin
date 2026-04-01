@@ -44,17 +44,24 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
     });
 
     try {
-      final user = await Supabase.instance.client
-          .from('users')
-          .select('user_id')
-          .eq('email', "untitled67890@gmail.com")
-          .maybeSingle();
+      final email = _userEmailController.text.trim();
+      dynamic userId;
 
-      if (user == null || user['user_id'] == null) {
-        setState(() {
-          _errorMessage = 'No user found for this email.';
-        });
-        return;
+      if (email.isNotEmpty) {
+        final user = await Supabase.instance.client
+            .from('users')
+            .select('user_id')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (user == null || user['user_id'] == null) {
+          setState(() {
+            _errorMessage = 'No user found for this email.';
+          });
+          return;
+        }
+
+        userId = user['user_id'];
       }
 
       final documents = _documentsController.text
@@ -63,14 +70,19 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
           .where((value) => value.isNotEmpty)
           .toList();
 
-      await Supabase.instance.client.from('products').insert({
+      final payload = <String, dynamic>{
         'product_name': _productNameController.text.trim(),
         'product_description': _productDescriptionController.text.trim(),
         'amount': double.parse(_amountController.text.trim()),
         'documents': documents,
         'product_name_hindi': _productNameHindiController.text.trim(),
-        'user_id': user['user_id'],
-      });
+      };
+
+      if (userId != null) {
+        payload['user_id'] = userId;
+      }
+
+      await Supabase.instance.client.from('products').insert(payload);
 
       setState(() {
         _successMessage = 'Product created successfully.';
@@ -208,13 +220,8 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'User email',
+                        hintText: 'Optional',
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Enter user email';
-                        }
-                        return null;
-                      },
                     ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 16),

@@ -95,16 +95,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           .from('orders')
           .select('order_id')
           .eq('status', status)
-          .gt('created_at', createdAtText)
-          .order('created_at', ascending: true)
+          .lt('created_at', createdAtText)
+          .order('created_at', ascending: false)
           .limit(1);
 
       final nextResponse = await Supabase.instance.client
           .from('orders')
           .select('order_id')
           .eq('status', status)
-          .lt('created_at', createdAtText)
-          .order('created_at', ascending: false)
+          .gt('created_at', createdAtText)
+          .order('created_at', ascending: true)
           .limit(1);
 
       if (!mounted) {

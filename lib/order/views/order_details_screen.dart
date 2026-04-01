@@ -25,15 +25,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     'refunded',
   ];
 
+  late dynamic _currentOrderId;
   late Future<Map<String, dynamic>?> _orderFuture;
   List<Map<String, dynamic>> _loadedDocuments = const [];
   bool _isLoadingDocuments = false;
   String? _documentsErrorMessage;
   bool _hasLoadedDocuments = false;
+  bool _isLoadingAdjacentOrders = false;
+  bool _hasResolvedAdjacentOrders = false;
+  dynamic _previousOrderId;
+  dynamic _nextOrderId;
 
   @override
   void initState() {
     super.initState();
+    _currentOrderId = widget.orderId;
     _orderFuture = _fetchOrder();
   }
 
@@ -41,11 +47,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final response = await Supabase.instance.client
         .from('orders')
         .select(
-          'message, status, first_document_name, first_document_url, '
+          'order_id, created_at, message, status, first_document_name, '
+          'first_document_url, '
           'second_document_name, second_document_url, phone, support_phone, '
           'is_others, applicant_name, product_name, user_id',
         )
-        .eq('order_id', widget.orderId)
+        .eq('order_id', _currentOrderId)
         .maybeSingle();
 
     return response;
@@ -53,6 +60,99 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _refreshOrder() async {
     setState(() {
+      _loadedDocuments = const [];
+      _documentsErrorMessage = null;
+      _hasLoadedDocuments = false;
+      _hasResolvedAdjacentOrders = false;
+      _previousOrderId = null;
+      _nextOrderId = null;
+      _orderFuture = _fetchOrder();
+    });
+  }
+
+  Future<void> _loadAdjacentOrders(Map<String, dynamic> order) async {
+    final createdAtText = order['created_at']?.toString().trim() ?? '';
+    final status = order['status']?.toString().trim() ?? '';
+
+    if (createdAtText.isEmpty || status.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _previousOrderId = null;
+        _nextOrderId = null;
+        _hasResolvedAdjacentOrders = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingAdjacentOrders = true;
+    });
+
+    try {
+      final previousResponse = await Supabase.instance.client
+          .from('orders')
+          .select('order_id')
+          .eq('status', status)
+          .gt('created_at', createdAtText)
+          .order('created_at', ascending: true)
+          .limit(1);
+
+      final nextResponse = await Supabase.instance.client
+          .from('orders')
+          .select('order_id')
+          .eq('status', status)
+          .lt('created_at', createdAtText)
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      if (!mounted) {
+        return;
+      }
+
+      final previousOrders =
+          (previousResponse as List<dynamic>).cast<Map<String, dynamic>>();
+      final nextOrders =
+          (nextResponse as List<dynamic>).cast<Map<String, dynamic>>();
+
+      setState(() {
+        _previousOrderId =
+            previousOrders.isEmpty ? null : previousOrders.first['order_id'];
+        _nextOrderId = nextOrders.isEmpty ? null : nextOrders.first['order_id'];
+        _hasResolvedAdjacentOrders = true;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _previousOrderId = null;
+        _nextOrderId = null;
+        _hasResolvedAdjacentOrders = true;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingAdjacentOrders = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _goToOrder(dynamic orderId) async {
+    if (orderId == null || orderId == _currentOrderId) {
+      return;
+    }
+
+    setState(() {
+      _currentOrderId = orderId;
+      _loadedDocuments = const [];
+      _documentsErrorMessage = null;
+      _hasLoadedDocuments = false;
+      _hasResolvedAdjacentOrders = false;
+      _previousOrderId = null;
+      _nextOrderId = null;
       _orderFuture = _fetchOrder();
     });
   }
@@ -74,13 +174,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     try {
       final isOthers = _readIsOthers(order['is_others']);
-      final query = Supabase.instance.client
-          .from('documents')
-          .select('document_id, document_name, document_value, document_type');
-
       final response = isOthers
-          ? await query.eq('order_id', widget.orderId)
-          : await query.eq('user_id', order['user_id']);
+          ? await Supabase.instance.client
+                .from('documents')
+                .select(
+                  'document_id, document_name, document_value, document_type',
+                )
+                .eq('order_id', _currentOrderId)
+          : await Supabase.instance.client
+                .from('documents')
+                .select(
+                  'document_id, document_name, document_value, '
+                  'document_type, orders!inner(is_others)',
+                )
+                .eq('user_id', order['user_id'])
+                .eq('orders.is_others', false);
 
       if (!mounted) {
         return;
@@ -323,7 +431,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             await Supabase.instance.client
                                 .from('orders')
                                 .update({'message': controller.text.trim()})
-                                .eq('order_id', widget.orderId);
+                                .eq('order_id', _currentOrderId);
 
                             if (!mounted || !dialogContext.mounted) {
                               return;
@@ -427,7 +535,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             await Supabase.instance.client
                                 .from('orders')
                                 .update({'status': selectedStatus})
-                                .eq('order_id', widget.orderId);
+                                .eq('order_id', _currentOrderId);
 
                             if (!mounted || !dialogContext.mounted) {
                               return;
@@ -566,7 +674,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                       .trim(),
                                   'requirement_type': selectedType,
                                   'user_id': userId,
-                                  'order_id': widget.orderId,
+                                  'order_id': _currentOrderId,
                                 });
 
                             if (!mounted || !dialogContext.mounted) {
@@ -783,7 +891,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                       documentNameController.text.trim(),
                                   documentUrlColumn: filePath,
                                 })
-                                .eq('order_id', widget.orderId);
+                                .eq('order_id', _currentOrderId);
 
                             if (!mounted || !dialogContext.mounted) {
                               return;
@@ -848,6 +956,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             return const Center(child: Text('Order not found.'));
           }
 
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _isLoadingAdjacentOrders) {
+              return;
+            }
+            if (_hasResolvedAdjacentOrders) {
+              return;
+            }
+            _loadAdjacentOrders(order);
+          });
+
           return ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -858,10 +976,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 20),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _previousOrderId == null
+                        ? null
+                        : () => _goToOrder(_previousOrderId),
+                    icon: const Icon(Icons.chevron_left_rounded),
+                    label: const Text('Previous'),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _nextOrderId == null
+                        ? null
+                        : () => _goToOrder(_nextOrderId),
+                    icon: const Icon(Icons.chevron_right_rounded),
+                    label: const Text('Next'),
+                  ),
+                  if (_isLoadingAdjacentOrders) ...[
+                    const SizedBox(width: 12),
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
+                  _ActionButton(
+                    label: 'Create requirements',
+                    onPressed: () => _showCreateRequirementDialog(
+                      order['user_id'],
+                    ),
+                  ),
                   _ActionButton(
                     label: 'Change Message',
                     onPressed: () => _showChangeMessageDialog(
@@ -898,12 +1050,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       failureMessage: 'Unable to upload second document.',
                       documentNameColumn: 'second_document_name',
                       documentUrlColumn: 'second_document_url',
-                    ),
-                  ),
-                  _ActionButton(
-                    label: 'Create requirements',
-                    onPressed: () => _showCreateRequirementDialog(
-                      order['user_id'],
                     ),
                   ),
                 ],

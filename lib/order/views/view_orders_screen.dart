@@ -107,8 +107,9 @@ class _OrdersTabState extends State<_OrdersTab> {
 
       final response = await Supabase.instance.client
           .from('orders')
-          .select('order_id, product_name, applicant_name')
+          .select('order_id, product_name, applicant_name, created_at')
           .eq('status', widget.status)
+          .order('created_at', ascending: false)
           .range(from, to);
 
       final nextPage = (response as List<dynamic>).cast<Map<String, dynamic>>();

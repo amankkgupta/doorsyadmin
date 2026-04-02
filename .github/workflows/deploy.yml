@@ -30,7 +30,7 @@ jobs:
         run: flutter pub get
 
       - name: Build web
-        run: flutter build web --release --base-href /doorstepadmin/
+        run: flutter build web --release
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

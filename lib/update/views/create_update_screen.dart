@@ -128,24 +128,18 @@ class _CreateUpdateScreenState extends State<CreateUpdateScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _launchUrlController,
-                      decoration: const InputDecoration(labelText: 'Launch URL'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Enter launch URL';
-                        }
-                        return null;
-                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Launch URL',
+                        hintText: 'Optional',
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _imageUrlController,
-                      decoration: const InputDecoration(labelText: 'Image URL'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Enter image URL';
-                        }
-                        return null;
-                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Image URL',
+                        hintText: 'Optional',
+                      ),
                     ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 16),

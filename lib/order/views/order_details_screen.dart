@@ -986,12 +986,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     label: const Text('Previous'),
                   ),
                   const SizedBox(width: 12),
-                  OutlinedButton.icon(
+                  OutlinedButton(
                     onPressed: _nextOrderId == null
                         ? null
                         : () => _goToOrder(_nextOrderId),
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    label: const Text('Next'),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Next'),
+                        SizedBox(width: 4),
+                        Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
                   ),
                   if (_isLoadingAdjacentOrders) ...[
                     const SizedBox(width: 12),

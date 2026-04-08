@@ -157,45 +157,43 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     });
   }
 
-  bool _readIsOthers(dynamic value) {
-    if (value is bool) {
-      return value;
-    }
-
-    final normalized = value?.toString().trim().toLowerCase();
-    return normalized == 'true' || normalized == '1' || normalized == 'yes';
-  }
-
-  Future<void> _loadDocuments(Map<String, dynamic> order) async {
+  Future<void> _loadDocuments() async {
     setState(() {
       _isLoadingDocuments = true;
       _documentsErrorMessage = null;
     });
 
     try {
-      final isOthers = _readIsOthers(order['is_others']);
-      final response = isOthers
-          ? await Supabase.instance.client
-                .from('documents')
-                .select(
-                  'document_id, document_name, document_value, document_type',
-                )
-                .eq('order_id', _currentOrderId)
-          : await Supabase.instance.client
-                .from('documents')
-                .select(
-                  'document_id, document_name, document_value, '
-                  'document_type, orders!inner(is_others)',
-                )
-                .eq('user_id', order['user_id'])
-                .eq('orders.is_others', false);
+      final response = await Supabase.instance.client
+          .from('documents')
+          .select('vault_document_id(name, value, type)')
+          .eq('order_id', _currentOrderId);
 
       if (!mounted) {
         return;
       }
 
+      final documents = (response as List<dynamic>)
+          .cast<Map<String, dynamic>>()
+          .map(
+            (document) {
+              final vaultDocument = document['vault_document_id'];
+              final related = vaultDocument is Map<String, dynamic>
+                  ? vaultDocument
+                  : <String, dynamic>{};
+
+              return <String, dynamic>{
+                'document_name': related['name'] ?? 'Document',
+                'document_value': related['value'],
+                'document_type': related['type'] ?? 'text',
+              };
+            },
+          )
+          .where((document) => document['document_value'] != null)
+          .toList();
+
       setState(() {
-        _loadedDocuments = List<Map<String, dynamic>>.from(response);
+        _loadedDocuments = documents;
         _hasLoadedDocuments = true;
       });
     } on PostgrestException catch (error) {
@@ -1034,7 +1032,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                   _ActionButton(
                     label: 'Load document',
-                    onPressed: () => _loadDocuments(order),
+                    onPressed: _loadDocuments,
                   ),
                   _ActionButton(
                     label: 'Upload first document',

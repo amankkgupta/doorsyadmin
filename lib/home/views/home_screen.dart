@@ -91,6 +91,12 @@ class HomeScreen extends StatelessWidget {
                               title: 'Chats',
                               description:
                                   'Open support and customer conversations.',
+                              onTap: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.supportInbox,
+                                );
+                              },
                             ),
                             _FeatureCard(
                               width: cardWidth,

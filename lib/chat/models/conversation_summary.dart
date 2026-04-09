@@ -1,0 +1,41 @@
+class ConversationSummary {
+  const ConversationSummary({
+    required this.conversationId,
+    required this.userId,
+    required this.messageId,
+    required this.supportUnread,
+    required this.modifiedAt,
+    required this.userName,
+    required this.userEmail,
+    required this.userPhone,
+    required this.latestMessagePreview,
+  });
+
+  final String conversationId;
+  final String userId;
+  final String messageId;
+  final int supportUnread;
+  final DateTime? modifiedAt;
+  final String userName;
+  final String userEmail;
+  final String userPhone;
+  final String latestMessagePreview;
+
+  ConversationSummary copyWith({
+    int? supportUnread,
+    String? latestMessagePreview,
+    DateTime? modifiedAt,
+  }) {
+    return ConversationSummary(
+      conversationId: conversationId,
+      userId: userId,
+      messageId: messageId,
+      supportUnread: supportUnread ?? this.supportUnread,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
+      userName: userName,
+      userEmail: userEmail,
+      userPhone: userPhone,
+      latestMessagePreview: latestMessagePreview ?? this.latestMessagePreview,
+    );
+  }
+}

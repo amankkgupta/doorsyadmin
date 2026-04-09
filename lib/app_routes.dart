@@ -1,4 +1,5 @@
 import 'package:admindoorstep/auth/views/login_screen.dart';
+import 'package:admindoorstep/chat/views/support_inbox_screen.dart';
 import 'package:admindoorstep/home/views/home_screen.dart';
 import 'package:admindoorstep/order/views/view_orders_screen.dart';
 import 'package:admindoorstep/product/views/create_product_screen.dart';
@@ -9,6 +10,7 @@ class AppRoutes {
   static const login = '/';
   static const home = '/home';
   static const viewOrders = '/view-orders';
+  static const supportInbox = '/support-inbox';
   static const createProduct = '/create-product';
   static const createUpdate = '/create-update';
 
@@ -16,6 +18,7 @@ class AppRoutes {
         login: (_) => const LoginScreen(),
         home: (_) => const HomeScreen(),
         viewOrders: (_) => const ViewOrdersScreen(),
+        supportInbox: (_) => const SupportInboxScreen(),
         createProduct: (_) => const CreateProductScreen(),
         createUpdate: (_) => const CreateUpdateScreen(),
       };

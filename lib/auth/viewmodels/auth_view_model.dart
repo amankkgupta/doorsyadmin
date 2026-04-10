@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum SignInResult { success, unauthorized, failure }
+enum SignInResult { success, failure }
 
 class AuthViewModel extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSubscription;
@@ -48,14 +48,7 @@ class AuthViewModel extends ChangeNotifier {
         Supabase.instance.client.auth.currentUser;
 
     if (_user != null) {
-      final isAuthorized = await _isAdminUser(_user!.id);
-      if (!isAuthorized) {
-        _errorMessage = 'Unauthorized';
-        await Supabase.instance.client.auth.signOut();
-        _user = null;
-      } else {
-        _errorMessage = null;
-      }
+      _errorMessage = null;
     }
 
     _isInitializing = false;
@@ -84,14 +77,6 @@ class AuthViewModel extends ChangeNotifier {
       if (_user == null) {
         _errorMessage = 'Unable to sign in right now.';
         return SignInResult.failure;
-      }
-
-      final isAuthorized = await _isAdminUser(_user!.id);
-      if (!isAuthorized) {
-        _errorMessage = 'Unauthorized';
-        await Supabase.instance.client.auth.signOut();
-        _user = null;
-        return SignInResult.unauthorized;
       }
 
       return SignInResult.success;
@@ -139,17 +124,6 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     }
   }
-
-  Future<bool> _isAdminUser(String userId) async {
-    final adminRecord = await Supabase.instance.client
-        .from('admins')
-        .select('admin_id')
-        .eq('admin_id', userId)
-        .maybeSingle();
-
-    return adminRecord != null;
-  }
-
   @override
   void dispose() {
     _authSubscription?.cancel();

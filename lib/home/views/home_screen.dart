@@ -28,11 +28,11 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final cardWidth = constraints.maxWidth < 700

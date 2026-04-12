@@ -201,14 +201,8 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                       controller: _documentsController,
                       decoration: const InputDecoration(
                         labelText: 'Documents',
-                        hintText: 'doc1, doc2, doc3',
+                        hintText: 'doc1, doc2, doc3 (optional)',
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Enter at least one document';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(

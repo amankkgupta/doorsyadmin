@@ -14,6 +14,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   final _productDescriptionController = TextEditingController();
   final _amountController = TextEditingController();
   final _documentsController = TextEditingController();
+  final _otherDetailsController = TextEditingController();
   final _productNameHindiController = TextEditingController();
   final _userEmailController = TextEditingController();
 
@@ -27,6 +28,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
     _productDescriptionController.dispose();
     _amountController.dispose();
     _documentsController.dispose();
+    _otherDetailsController.dispose();
     _productNameHindiController.dispose();
     _userEmailController.dispose();
     super.dispose();
@@ -69,12 +71,18 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
           .map((value) => value.trim())
           .where((value) => value.isNotEmpty)
           .toList();
+      final otherDetails = _otherDetailsController.text
+          .split(',')
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
 
       final payload = <String, dynamic>{
         'product_name': _productNameController.text.trim(),
         'product_description': _productDescriptionController.text.trim(),
         'amount': double.parse(_amountController.text.trim()),
         'documents': documents,
+        'criteria': otherDetails,
         'product_name_hindi': _productNameHindiController.text.trim(),
       };
 
@@ -93,6 +101,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       _productDescriptionController.clear();
       _amountController.clear();
       _documentsController.clear();
+      _otherDetailsController.clear();
       _productNameHindiController.clear();
       _userEmailController.clear();
     } on PostgrestException catch (error) {
@@ -197,6 +206,20 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Enter at least one document';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _otherDetailsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Other details',
+                        hintText: 'detail1, detail2, detail3',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Enter at least one other detail';
                         }
                         return null;
                       },

@@ -13,6 +13,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   final _productNameController = TextEditingController();
   final _productDescriptionController = TextEditingController();
   final _amountController = TextEditingController();
+  final _mrpController = TextEditingController();
   final _documentsController = TextEditingController();
   final _otherDetailsController = TextEditingController();
   final _productNameHindiController = TextEditingController();
@@ -27,6 +28,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
     _productNameController.dispose();
     _productDescriptionController.dispose();
     _amountController.dispose();
+    _mrpController.dispose();
     _documentsController.dispose();
     _otherDetailsController.dispose();
     _productNameHindiController.dispose();
@@ -81,6 +83,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
         'product_name': _productNameController.text.trim(),
         'product_description': _productDescriptionController.text.trim(),
         'amount': double.parse(_amountController.text.trim()),
+        'mrp': double.parse(_mrpController.text.trim()),
         'documents': documents,
         'criteria': otherDetails,
         'product_name_hindi': _productNameHindiController.text.trim(),
@@ -100,6 +103,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       _productNameController.clear();
       _productDescriptionController.clear();
       _amountController.clear();
+      _mrpController.clear();
       _documentsController.clear();
       _otherDetailsController.clear();
       _productNameHindiController.clear();
@@ -192,6 +196,25 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                         }
                         if (double.tryParse(value.trim()) == null) {
                           return 'Enter a valid amount';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _mrpController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'MRP',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Enter MRP';
+                        }
+                        if (double.tryParse(value.trim()) == null) {
+                          return 'Enter a valid MRP';
                         }
                         return null;
                       },

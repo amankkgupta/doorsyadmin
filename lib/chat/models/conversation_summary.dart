@@ -7,7 +7,6 @@ class ConversationSummary {
     required this.modifiedAt,
     required this.userName,
     required this.userEmail,
-    required this.userPhone,
     required this.latestMessagePreview,
   });
 
@@ -18,7 +17,6 @@ class ConversationSummary {
   final DateTime? modifiedAt;
   final String userName;
   final String userEmail;
-  final String userPhone;
   final String latestMessagePreview;
 
   ConversationSummary copyWith({
@@ -34,7 +32,6 @@ class ConversationSummary {
       modifiedAt: modifiedAt ?? this.modifiedAt,
       userName: userName,
       userEmail: userEmail,
-      userPhone: userPhone,
       latestMessagePreview: latestMessagePreview ?? this.latestMessagePreview,
     );
   }

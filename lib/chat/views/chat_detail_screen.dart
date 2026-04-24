@@ -97,7 +97,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       final message = viewModel.messages[index];
                       return _ChatBubble(
                         message: message,
-                        supportUserId: viewModel.supportUserId,
+                        userId: viewModel.userId,
                       );
                     },
                   ),
@@ -161,24 +161,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 class _ChatBubble extends StatelessWidget {
   const _ChatBubble({
     required this.message,
-    required this.supportUserId,
+    required this.userId,
   });
 
   final ChatMessageItem message;
-  final String supportUserId;
+  final String userId;
 
   @override
   Widget build(BuildContext context) {
-    final isSupportMessage =
-        message.senderId.isNotEmpty && message.senderId == supportUserId;
+    final isUserMessage = message.senderId.isNotEmpty && message.senderId == userId;
     return Align(
-      alignment: isSupportMessage ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isUserMessage ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 520),
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSupportMessage ? const Color(0xFF0F766E) : Colors.white,
+          color: isUserMessage ? Colors.white : const Color(0xFF0F766E),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -187,7 +186,7 @@ class _ChatBubble extends StatelessWidget {
             Text(
               message.message,
               style: TextStyle(
-                color: isSupportMessage ? Colors.white : Colors.black87,
+                color: isUserMessage ? Colors.black87 : Colors.white,
               ),
             ),
             const SizedBox(height: 4),
@@ -195,7 +194,7 @@ class _ChatBubble extends StatelessWidget {
               _formatTime(message.createdAt),
               style: TextStyle(
                 fontSize: 12,
-                color: isSupportMessage ? Colors.white70 : Colors.black54,
+                color: isUserMessage ? Colors.black54 : Colors.white70,
               ),
             ),
           ],

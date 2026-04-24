@@ -1,4 +1,5 @@
 import 'package:admindoorstep/chat/models/conversation_summary.dart';
+import 'package:admindoorstep/chat/models/chat_user_search_result.dart';
 import 'package:admindoorstep/chat/repositories/chat_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,13 +17,60 @@ class SupportInboxViewModel extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isSearchingUser = false;
   bool _hasMore = true;
   String? _errorMessage;
+  String? _searchErrorMessage;
+  final List<ChatUserSearchResult> _searchedUsers = [];
 
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
   bool get hasMore => _hasMore;
   String? get errorMessage => _errorMessage;
+  bool get isSearchingUser => _isSearchingUser;
+  String? get searchErrorMessage => _searchErrorMessage;
+  List<ChatUserSearchResult> get searchedUsers => List.unmodifiable(_searchedUsers);
+
+  Future<void> searchUserByEmail(String email) async {
+    final normalizedEmail = email.trim();
+    if (_isSearchingUser) {
+      return;
+    }
+
+    if (normalizedEmail.isEmpty) {
+      _searchedUsers.clear();
+      _searchErrorMessage = 'Enter user email';
+      notifyListeners();
+      return;
+    }
+
+    _isSearchingUser = true;
+    _searchErrorMessage = null;
+    _searchedUsers.clear();
+    notifyListeners();
+
+    try {
+      final users = await _repository.findUsersByEmailPrefix(normalizedEmail);
+      if (users.isEmpty) {
+        _searchErrorMessage = 'No users found for this email prefix.';
+      } else {
+        _searchedUsers.addAll(users);
+      }
+    } on PostgrestException catch (error) {
+      _searchErrorMessage = error.message;
+    } catch (error) {
+      _searchErrorMessage = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isSearchingUser = false;
+      notifyListeners();
+    }
+  }
+
+  void clearSearchResult() {
+    _searchedUsers.clear();
+    _searchErrorMessage = null;
+    notifyListeners();
+  }
 
   Future<void> loadInitial() async {
     if (_isLoading) {

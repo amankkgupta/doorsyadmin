@@ -18,8 +18,66 @@ class SupportInboxScreen extends StatelessWidget {
   }
 }
 
-class _SupportInboxView extends StatelessWidget {
+class _SupportInboxView extends StatefulWidget {
   const _SupportInboxView();
+
+  @override
+  State<_SupportInboxView> createState() => _SupportInboxViewState();
+}
+
+class _SupportInboxViewState extends State<_SupportInboxView> {
+  final TextEditingController _searchEmailController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchEmailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openChat({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required String userId,
+    required String supportUserId,
+    String? conversationId,
+    ConversationSummary? conversationToMark,
+  }) async {
+    final viewModel = context.read<SupportInboxViewModel>();
+
+    if (conversationToMark != null) {
+      final didMarkRead = await viewModel.markConversationRead(conversationToMark);
+      if (!didMarkRead || !context.mounted) {
+        return;
+      }
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider(
+          create: (_) => ChatDetailViewModel(
+            conversationId: conversationId,
+            userId: userId,
+            supportUserId: supportUserId,
+          )..bootstrap(),
+          child: ChatDetailScreen(
+            title: title,
+            subtitle: subtitle,
+          ),
+        ),
+      ),
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    await viewModel.loadInitial();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +92,88 @@ class _SupportInboxView extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            TextField(
+              controller: _searchEmailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => viewModel.searchUserByEmail(
+                _searchEmailController.text,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Search user by email',
+                hintText: 'user@example.com',
+                suffixIcon: viewModel.isSearchingUser
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : IconButton(
+                        onPressed: () => viewModel.searchUserByEmail(
+                          _searchEmailController.text,
+                        ),
+                        icon: const Icon(Icons.search),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (viewModel.searchErrorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  viewModel.searchErrorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            if (viewModel.searchedUsers.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Matched users (${viewModel.searchedUsers.length})',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _searchEmailController.clear();
+                        viewModel.clearSearchResult();
+                      },
+                      child: const Text('Clear'),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  children: viewModel.searchedUsers
+                      .map(
+                        (user) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _SearchedUserCard(
+                            userName: user.userName,
+                            userEmail: user.userEmail,
+                            onMessage: () => _openChat(
+                              context: context,
+                              title: user.userName,
+                              subtitle: user.userEmail,
+                              userId: user.userId,
+                              supportUserId: supportUserId,
+                              conversationId: user.conversationId,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
             if (viewModel.isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 80),
@@ -56,41 +196,67 @@ class _SupportInboxView extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _ConversationTile(
                     conversation: conversation,
-                    onTap: () async {
-                      final didMarkRead =
-                          await viewModel.markConversationRead(conversation);
-                      if (!didMarkRead || !context.mounted) {
-                        return;
-                      }
-                      if (!context.mounted) {
-                        return;
-                      }
-
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                              builder: (_) => ChangeNotifierProvider(
-                            create: (_) => ChatDetailViewModel(
-                              conversationId: conversation.conversationId,
-                              userId: conversation.userId,
-                              supportUserId: supportUserId,
-                            )..bootstrap(),
-                            child: ChatDetailScreen(
-                              title: conversation.userName,
-                              subtitle: conversation.userEmail,
-                            ),
-                          ),
-                        ),
-                      );
-                      if (!context.mounted) {
-                        return;
-                      }
-                      await viewModel.loadInitial();
-                    },
+                    onTap: () => _openChat(
+                      context: context,
+                      title: conversation.userName,
+                      subtitle: conversation.userEmail,
+                      userId: conversation.userId,
+                      supportUserId: supportUserId,
+                      conversationId: conversation.conversationId,
+                      conversationToMark: conversation,
+                    ),
                   ),
                 ),
               ),
               _InboxFooter(viewModel: viewModel),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchedUserCard extends StatelessWidget {
+  const _SearchedUserCard({
+    required this.userName,
+    required this.userEmail,
+    required this.onMessage,
+  });
+
+  final String userName;
+  final String userEmail;
+  final VoidCallback onMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              userName,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            if (userEmail.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(userEmail),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilledButton(
+                  onPressed: onMessage,
+                  child: const Text('Message user'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -144,15 +310,6 @@ class _ConversationTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         conversation.userEmail,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                    if (conversation.userPhone.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        conversation.userPhone,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.black54,
                         ),

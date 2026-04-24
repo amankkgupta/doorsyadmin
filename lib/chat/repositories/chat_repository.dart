@@ -1,4 +1,5 @@
 import 'package:admindoorstep/chat/models/chat_message_item.dart';
+import 'package:admindoorstep/chat/models/chat_user_search_result.dart';
 import 'package:admindoorstep/chat/models/conversation_summary.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -46,7 +47,6 @@ class ChatRepository {
         modifiedAt: DateTime.tryParse((row['modified_at'] ?? '').toString()),
         userName: _pickUserName(user, userId),
         userEmail: (user['email'] ?? '').toString(),
-        userPhone: (user['phone'] ?? user['mobile'] ?? '').toString(),
         latestMessagePreview: (message['message'] ?? '').toString(),
       );
     }).toList();
@@ -110,16 +110,21 @@ class ChatRepository {
   }
 
   Future<ChatMessageItem> sendSupportMessage({
-    required String conversationId,
+    String? conversationId,
     required String userId,
     required String supportUserId,
     required String message,
   }) async {
     try {
+      final resolvedConversationId = await _resolveConversationId(
+        userId: userId,
+        conversationId: conversationId,
+      );
+
       final inserted = await _client
           .from('chats')
           .insert({
-            'conversation_id': conversationId,
+            'conversation_id': resolvedConversationId,
             'sender_id': supportUserId,
             'message': message,
           })
@@ -132,7 +137,7 @@ class ChatRepository {
         final conversation = await _client
             .from('conversations')
             .select('user_unread')
-            .eq('conversation_id', conversationId)
+            .eq('conversation_id', resolvedConversationId)
             .maybeSingle();
 
         final currentUserUnread =
@@ -146,7 +151,7 @@ class ChatRepository {
               'user_unread': currentUserUnread + 1,
               'support_unread': 0,
             })
-            .eq('conversation_id', conversationId);
+            .eq('conversation_id', resolvedConversationId);
       } on PostgrestException {
         rethrow;
       } catch (_) {
@@ -161,6 +166,155 @@ class ChatRepository {
     }
   }
 
+  Future<List<ChatUserSearchResult>> findUsersByEmailPrefix(String emailPrefix) async {
+    final normalizedEmail = emailPrefix.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return const [];
+    }
+
+    try {
+      final rows = await _client
+          .from('users')
+          .select('user_id, name, email')
+          .ilike('email', '$normalizedEmail%')
+          .order('email', ascending: true)
+          .limit(20);
+
+      final users = List<Map<String, dynamic>>.from(rows)
+          .where((row) => (row['user_id'] ?? '').toString().trim().isNotEmpty)
+          .toList();
+
+      if (users.isEmpty) {
+        return const [];
+      }
+
+      final userIds = users
+          .map((row) => (row['user_id'] ?? '').toString().trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+      final conversationIdByUserId =
+          await _fetchConversationIdsByUserIds(userIds);
+
+      return users
+          .map(
+            (user) {
+              final userId = (user['user_id'] ?? '').toString().trim();
+              return ChatUserSearchResult(
+                userId: userId,
+                userName: _pickUserName(user, userId),
+                userEmail: (user['email'] ?? '').toString(),
+                conversationId: conversationIdByUserId[userId],
+              );
+            },
+          )
+          .toList();
+    } on PostgrestException {
+      rethrow;
+    } catch (_) {
+      throw Exception('Unable to search user by email.');
+    }
+  }
+
+  Future<Map<String, String>> _fetchConversationIdsByUserIds(
+    List<String> userIds,
+  ) async {
+    if (userIds.isEmpty) {
+      return const {};
+    }
+
+    try {
+      final rows = await _client
+          .from('conversations')
+          .select('user_id, conversation_id, modified_at')
+          .inFilter('user_id', userIds)
+          .order('modified_at', ascending: false);
+
+      final map = <String, String>{};
+      for (final row in List<Map<String, dynamic>>.from(rows)) {
+        final userId = (row['user_id'] ?? '').toString().trim();
+        final conversationId = (row['conversation_id'] ?? '').toString().trim();
+        if (userId.isEmpty || conversationId.isEmpty || map.containsKey(userId)) {
+          continue;
+        }
+        map[userId] = conversationId;
+      }
+      return map;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<String?> findConversationIdByUserId(String userId) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return null;
+    }
+
+    try {
+      final row = await _client
+          .from('conversations')
+          .select('conversation_id')
+          .eq('user_id', normalizedUserId)
+          .order('modified_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      final conversationId = (row?['conversation_id'] ?? '').toString().trim();
+      return conversationId.isEmpty ? null : conversationId;
+    } on PostgrestException {
+      rethrow;
+    } catch (_) {
+      throw Exception('Unable to find conversation for user.');
+    }
+  }
+
+  Future<String> _resolveConversationId({
+    required String userId,
+    String? conversationId,
+  }) async {
+    final existingConversationId = (conversationId ?? '').trim();
+    if (existingConversationId.isNotEmpty) {
+      return existingConversationId;
+    }
+
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required to send message.');
+    }
+
+    final foundConversationId = await findConversationIdByUserId(normalizedUserId);
+    if (foundConversationId != null && foundConversationId.isNotEmpty) {
+      return foundConversationId;
+    }
+
+    try {
+      final nowIso = DateTime.now().toIso8601String();
+      final insertedConversation = await _client
+          .from('conversations')
+          .insert({
+            'user_id': normalizedUserId,
+            'user_unread': 0,
+            'support_unread': 0,
+            'created_at': nowIso,
+            'modified_at': nowIso,
+          })
+          .select('conversation_id')
+          .single();
+
+      final createdConversationId =
+          (insertedConversation['conversation_id'] ?? '').toString().trim();
+      if (createdConversationId.isEmpty) {
+        throw Exception('Unable to create conversation.');
+      }
+
+      return createdConversationId;
+    } on PostgrestException {
+      rethrow;
+    } catch (_) {
+      throw Exception('Unable to create conversation.');
+    }
+  }
+
   Future<Map<String, Map<String, dynamic>>> _fetchUsers(List<String> userIds) async {
     if (userIds.isEmpty) {
       return const {};
@@ -169,7 +323,7 @@ class ChatRepository {
     try {
       final rows = await _client
           .from('users')
-          .select('*')
+          .select('user_id, name, email')
           .inFilter('user_id', userIds);
 
       return {
@@ -206,8 +360,6 @@ class ChatRepository {
   String _pickUserName(Map<String, dynamic> user, String fallbackUserId) {
     final candidates = [
       user['name'],
-      user['full_name'],
-      user['username'],
       user['email'],
       fallbackUserId,
     ];

@@ -615,6 +615,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       items: const [
                         DropdownMenuItem(value: 'file', child: Text('file')),
                         DropdownMenuItem(value: 'text', child: Text('text')),
+                        DropdownMenuItem(value: 'pay', child: Text('pay')),
                       ],
                       onChanged: isSaving
                           ? null

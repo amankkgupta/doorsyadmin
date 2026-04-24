@@ -5,15 +5,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatDetailViewModel extends ChangeNotifier {
   ChatDetailViewModel({
-    required this.conversationId,
+    String? conversationId,
     required this.userId,
     required this.supportUserId,
     ChatRepository? repository,
-  }) : _repository = repository ?? ChatRepository();
+  }) : _conversationId = (conversationId ?? '').trim().isEmpty
+           ? null
+           : conversationId!.trim(),
+       _repository = repository ?? ChatRepository();
 
   static const int pageSize = 10;
 
-  final String conversationId;
+  String? _conversationId;
   final String userId;
   final String supportUserId;
   final ChatRepository _repository;
@@ -33,6 +36,7 @@ class ChatDetailViewModel extends ChangeNotifier {
   bool get isSending => _isSending;
   bool get hasMore => _hasMore;
   String? get errorMessage => _errorMessage;
+  String? get conversationId => _conversationId;
 
   Future<void> bootstrap() async {
     if (_bootstrapped) {
@@ -40,12 +44,15 @@ class ChatDetailViewModel extends ChangeNotifier {
     }
 
     _bootstrapped = true;
-    try {
-      await _repository.markSupportUnreadAsRead(conversationId);
-    } on PostgrestException catch (error) {
-      _errorMessage = error.message;
-    } catch (error) {
-      _errorMessage = error.toString().replaceFirst('Exception: ', '');
+    final activeConversationId = _conversationId;
+    if (activeConversationId != null && activeConversationId.isNotEmpty) {
+      try {
+        await _repository.markSupportUnreadAsRead(activeConversationId);
+      } on PostgrestException catch (error) {
+        _errorMessage = error.message;
+      } catch (error) {
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
+      }
     }
     await loadInitial();
   }
@@ -61,10 +68,18 @@ class ChatDetailViewModel extends ChangeNotifier {
     _messages.clear();
     notifyListeners();
 
+    final activeConversationId = _conversationId;
+    if (activeConversationId == null || activeConversationId.isEmpty) {
+      _hasMore = false;
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     try {
       final items = await _repository.fetchMessagesPage(
         userId: userId,
-        conversationId: conversationId,
+        conversationId: activeConversationId,
         offset: 0,
         limit: pageSize,
       );
@@ -83,6 +98,11 @@ class ChatDetailViewModel extends ChangeNotifier {
       return;
     }
 
+    final activeConversationId = _conversationId;
+    if (activeConversationId == null || activeConversationId.isEmpty) {
+      return;
+    }
+
     _isLoadingMore = true;
     _errorMessage = null;
     notifyListeners();
@@ -90,7 +110,7 @@ class ChatDetailViewModel extends ChangeNotifier {
     try {
       final items = await _repository.fetchMessagesPage(
         userId: userId,
-        conversationId: conversationId,
+        conversationId: activeConversationId,
         offset: _messages.length,
         limit: pageSize,
       );
@@ -120,12 +140,17 @@ class ChatDetailViewModel extends ChangeNotifier {
 
     try {
       final inserted = await _repository.sendSupportMessage(
-        conversationId: conversationId,
+        conversationId: _conversationId,
         userId: userId,
         supportUserId: supportUserId,
         message: message,
       );
+      final insertedConversationId = inserted.conversationId.trim();
+      if (insertedConversationId.isNotEmpty) {
+        _conversationId = insertedConversationId;
+      }
       _messages.add(inserted);
+      _hasMore = false;
       return true;
     } on PostgrestException catch (error) {
       _errorMessage = error.message;
